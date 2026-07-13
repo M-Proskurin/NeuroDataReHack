@@ -337,6 +337,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-ng-2.3.3-h0261ad2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
       - pypi: https://files.pythonhosted.org/packages/0e/4b/324a8281c4556aed2f784f3f0a60ec2566e640eb8b263cc17485ed9cf727/elephant-1.2.1-cp311-cp311-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/3e/33/485cb65a071e2e15b86693e25467ada58164f00ec076b8e24191671004cb/remfile-0.1.13-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/95/da/0d1df507cf574b3f224ccc3d45244c9a1d732c81dcb26b1e8a766ae271a8/scipy-1.17.1-cp311-cp311-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9c/9a/f8294a4f52408b228f8fdb447b2e842f40b3ab37780b48d6a5d12afcabae/literate_dataclasses-0.0.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/db/41/d148c94621c8baad97c820ebf3357e607ab209eeba9ac857fe752b05cba5/cebra-0.4.0-py2.py3-none-any.whl
@@ -5545,6 +5546,14 @@ packages:
   - nixio>=1.5.0 ; extra == 'tutorials'
   - viziphant ; extra == 'tutorials'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/3e/33/485cb65a071e2e15b86693e25467ada58164f00ec076b8e24191671004cb/remfile-0.1.13-py3-none-any.whl
+  name: remfile
+  version: 0.1.13
+  sha256: 1e87dacc76a4db9fbbcb7ccaaa275e6b428b7d4528d39b88f8d790e17d1b50c3
+  requires_dist:
+  - numpy
+  - h5py
+  - requests
 - pypi: https://files.pythonhosted.org/packages/95/da/0d1df507cf574b3f224ccc3d45244c9a1d732c81dcb26b1e8a766ae271a8/scipy-1.17.1-cp311-cp311-win_amd64.whl
   name: scipy
   version: 1.17.1

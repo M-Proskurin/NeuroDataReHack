@@ -40,5 +40,6 @@ pytorch = "*"
 [pypi-dependencies]
 cebra = "*"           # behavior-aligned nonlinear embedding (primary tool)
 elephant = "*"        # GPFA + spike-train tools
+remfile = ">=0.1.13, <0.2"
 # giotto-tda omitted: no py3.11/win-64 wheel (needs CMake source build).
 # Persistent homology is covered by `ripser` above.
