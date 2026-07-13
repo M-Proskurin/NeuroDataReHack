@@ -1,0 +1,12 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# raw + intermediate data (see CLAUDE.md — never commit NWB/rate matrices)
+data/raw/
+data/processed/
+
+# python cruft
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

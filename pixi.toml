@@ -1,0 +1,44 @@
+[workspace]
+authors = ["Misha <m.proskurin@gmail.com>"]
+channels = ["conda-forge"]
+name = "NeuroDataReHack"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+lab = "jupyter lab"
+
+[dependencies]
+# --- core scientific stack ---
+python = "3.11.*"
+numpy = "*"
+scipy = "*"
+pandas = "*"
+matplotlib = "*"
+seaborn = "*"
+h5py = "*"
+tqdm = "*"
+
+# --- interactive / notebooks ---
+jupyterlab = "*"
+ipykernel = "*"
+ipywidgets = "*"
+
+# --- NWB / DANDI data access ---
+pynwb = "*"
+dandi = "*"
+spikeinterface = "*"
+
+# --- dimensionality reduction / manifolds ---
+scikit-learn = "*"
+umap-learn = "*"
+ripser = "*"          # persistent homology
+
+# --- deep-learning backend for CEBRA (CPU build) ---
+pytorch = "*"
+
+[pypi-dependencies]
+cebra = "*"           # behavior-aligned nonlinear embedding (primary tool)
+elephant = "*"        # GPFA + spike-train tools
+# giotto-tda omitted: no py3.11/win-64 wheel (needs CMake source build).
+# Persistent homology is covered by `ripser` above.
