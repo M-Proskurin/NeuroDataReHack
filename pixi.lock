@@ -285,6 +285,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/multidict-6.7.1-py311h3f79411_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/numba-0.65.1-py311h34437f8_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/numcodecs-0.15.1-py311h11fd7f3_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/numexpr-2.14.1-mkl_py311hc8bcaf1_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/numpy-2.4.6-py311h65cb7f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/onemkl-license-2026.1.0-h57928b3_233.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/openjpeg-2.5.4-h0e57b4f_0.conda
@@ -341,6 +342,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/95/da/0d1df507cf574b3f224ccc3d45244c9a1d732c81dcb26b1e8a766ae271a8/scipy-1.17.1-cp311-cp311-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9c/9a/f8294a4f52408b228f8fdb447b2e842f40b3ab37780b48d6a5d12afcabae/literate_dataclasses-0.0.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/db/41/d148c94621c8baad97c820ebf3357e607ab209eeba9ac857fe752b05cba5/cebra-0.4.0-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/f2/6e/ece2f7bfaa3e0041b57482c32367d76e63a5ea4585779e5c8acadf481f14/dPCA-1.0.5-py3-none-any.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/noarch/acres-0.5.0-pyhcf101f3_1.conda
   sha256: 9ac979adca81569d1bf1f4d1195d0067a071a827a1894abdd5aa8bd48d7b9da3
@@ -4573,6 +4575,26 @@ packages:
   run_exports: {}
   size: 533006
   timestamp: 1764780707452
+- conda: https://conda.anaconda.org/conda-forge/win-64/numexpr-2.14.1-mkl_py311hc8bcaf1_2.conda
+  sha256: d5d1f6cbcbd654c9c14535f9c4e06d7c71e1c74e887eee137b15878e7af2e20e
+  md5: c383d4cf3d8c3ec4ccc70af1cd796922
+  depends:
+  - libblas * *mkl
+  - mkl >=2026.0.0,<2027.0a0
+  - numpy >=1.23,<3
+  - numpy >=1.23.0
+  - python >=3.11,<3.12.0a0
+  - python_abi 3.11.* *_cp311
+  - ucrt >=10.0.20348.0
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/numexpr?source=hash-mapping
+  run_exports: {}
+  size: 210154
+  timestamp: 1778498797820
 - conda: https://conda.anaconda.org/conda-forge/win-64/numpy-2.4.6-py311h65cb7f3_0.conda
   sha256: cd26f615140d0ed557f8927947ca62c181d55ddbe418eebd24bd06cd32fb3938
   md5: ef5c1dedd943abfb0b80112ba46d4ab8
@@ -5662,3 +5684,7 @@ packages:
   - pandas ; extra == 'integrations'
   - plotly ; extra == 'integrations'
   requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/f2/6e/ece2f7bfaa3e0041b57482c32367d76e63a5ea4585779e5c8acadf481f14/dPCA-1.0.5-py3-none-any.whl
+  name: dpca
+  version: 1.0.5
+  sha256: 73b0765aedbfe367fab28b20c9902c567ba8ac96c35d76ee576de655786ede18
