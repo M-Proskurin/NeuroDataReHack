@@ -1,5 +1,9 @@
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/python.exe",
   "python.terminal.activateEnvironment": false,
-  "python.analysis.extraPaths": ["${workspaceFolder}/src"]
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/src/common",
+    "${workspaceFolder}/src/000447",
+    "${workspaceFolder}/src/000978"
+  ]
 }

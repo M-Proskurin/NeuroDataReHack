@@ -23,10 +23,14 @@ would concatenate matched bins across animals before aligning.
 Output: data/processed/stage4_alignment_<method>_<bin>ms.csv
 
 Usage:
-    pixi run python src/04_cross_condition.py                 # cebra, all subjects
-    pixi run python src/04_cross_condition.py --method umap isomap
+    pixi run python src/000447/04_cross_condition.py                 # cebra, all subjects
+    pixi run python src/000447/04_cross_condition.py --method umap isomap
 """
 from __future__ import annotations
+
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1] / "common"))
 
 import argparse
 
@@ -37,9 +41,9 @@ from sklearn.cross_decomposition import CCA
 
 from config import (
     BIN_SIZE_S,
-    DATA_PROCESSED,
     RANDOM_SEED,
     REGIONS,
+    processed_dir,
     processed_path,
     spatial_grid_labels,
 )
@@ -50,7 +54,7 @@ N_SHUFFLE = 200
 
 
 def _load_embedding(method: str, subject: str, region: str, bin_ms: int) -> dict | None:
-    f = DATA_PROCESSED / f"emb_{method}_{subject}_{region}_{bin_ms}ms.npz"
+    f = processed_dir() / f"emb_{method}_{subject}_{region}_{bin_ms}ms.npz"
     return dict(np.load(f, allow_pickle=False)) if f.exists() else None
 
 
@@ -138,7 +142,7 @@ def analyze_subject(method: str, subject: str, bin_ms: int, rng) -> list[dict]:
 
 def _subjects(method: str, bin_ms: int) -> list[str]:
     subs = set()
-    for f in DATA_PROCESSED.glob(f"emb_{method}_*_{bin_ms}ms.npz"):
+    for f in processed_dir().glob(f"emb_{method}_*_{bin_ms}ms.npz"):
         subs.add(f.stem.split("_")[2])
     return sorted(subs)
 

@@ -24,15 +24,17 @@ Output: data/processed/rates_<subject>_<region>_<bin>ms.npz containing
     source     ()           <U..     DANDI asset path
 
 Usage:
-    pixi run python src/01_extraction.py                 # all sessions, both regions
-    pixi run python src/01_extraction.py --session <asset-path>
-    pixi run python src/01_extraction.py --bin-ms 100
+    pixi run python src/000447/01_extraction.py                 # all sessions, both regions
+    pixi run python src/000447/01_extraction.py --session <asset-path>
+    pixi run python src/000447/01_extraction.py --bin-ms 100
 """
 from __future__ import annotations
 
-import argparse
-from importlib import import_module
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1] / "common"))
 
+import argparse
 import numpy as np
 
 from config import (
@@ -44,7 +46,7 @@ from config import (
 )
 
 # stage-0 helper (module name starts with a digit)
-dl = import_module("00_download")
+import download as dl                    # streaming helper from src/common
 
 EPOCH_TABLE = "epoch intervals"
 CONDITION_WORDS = ("novel", "familiar")

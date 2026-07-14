@@ -15,11 +15,15 @@ stage 4 (Procrustes/CCA) and stage 5 (topology) can pick it up.
     to the env if you want it as a further comparison.
 
 Usage:
-    pixi run python src/03_nonlinear_embedding.py                    # all methods, all matrices
-    pixi run python src/03_nonlinear_embedding.py --method cebra
-    pixi run python src/03_nonlinear_embedding.py --dim 3 --bin-ms 1000
+    pixi run python src/000447/03_nonlinear_embedding.py                    # all methods, all matrices
+    pixi run python src/000447/03_nonlinear_embedding.py --method cebra
+    pixi run python src/000447/03_nonlinear_embedding.py --dim 3 --bin-ms 1000
 """
 from __future__ import annotations
+
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1] / "common"))
 
 import argparse
 

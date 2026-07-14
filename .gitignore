@@ -2,7 +2,8 @@
 .pixi/*
 !.pixi/config.toml
 
-# raw + intermediate data (see CLAUDE.md — never commit NWB/rate matrices)
+# raw + intermediate data, namespaced by dandiset under data/{raw,processed}/<id>/
+# (see CLAUDE.md — never commit NWB / rate matrices / embeddings)
 data/raw/
 data/processed/
 

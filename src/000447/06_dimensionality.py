@@ -18,10 +18,14 @@ Averaged over a K_n x K_t grid of folds, per subject / region / condition.
 Output: data/processed/stage6_dimensionality_<bin>ms.csv
 
 Usage:
-    pixi run python src/06_dimensionality.py
-    pixi run python src/06_dimensionality.py --bin-ms 1000 --max-dim 25
+    pixi run python src/000447/06_dimensionality.py
+    pixi run python src/000447/06_dimensionality.py --bin-ms 1000 --max-dim 25
 """
 from __future__ import annotations
+
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1] / "common"))
 
 import argparse
 

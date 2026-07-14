@@ -11,14 +11,13 @@ Two access modes:
     the DANDI Python API, for offline / repeated heavy access.
 
 CLI:
-    pixi run python src/00_download.py --list                 # list asset paths
-    pixi run python src/00_download.py --stream <asset-path>  # open + print lazily
-    pixi run python src/00_download.py --download <asset-path> # one asset to data/raw/
-    pixi run python src/00_download.py --download-all          # full dandiset (~33 GiB)
+    pixi run python src/common/download.py --list                 # list asset paths
+    pixi run python src/common/download.py --stream <asset-path>  # open + print lazily
+    pixi run python src/common/download.py --download <asset-path> # one asset to data/raw/
+    pixi run python src/common/download.py --download-all          # full dandiset (~33 GiB)
 
-Programmatic use (e.g. from src/01_extraction.py):
-    from importlib import import_module
-    dl = import_module("00_download")
+Programmatic use (e.g. from src/000447/01_extraction.py):
+    import download as dl                      # src/common is on sys.path
     with dl.stream_nwb("sub-XX/sub-XX_....nwb") as nwb:
         units = nwb.units.to_dataframe()   # only the bytes touched are fetched
 
@@ -37,7 +36,7 @@ from dandi.download import DownloadExisting, download
 from pynwb import NWBHDF5IO
 from pynwb.file import NWBFile
 
-from config import DANDISET_ID, DATA_RAW
+from config import DANDISET_ID, raw_dir
 
 DEFAULT_VERSION = "draft"
 
@@ -81,20 +80,20 @@ def stream_nwb(filepath: str, dandiset_id: str = DANDISET_ID,
 
 def download_asset(filepath: str, dandiset_id: str = DANDISET_ID,
                    version: str = DEFAULT_VERSION, skip_existing: bool = True):
-    """Download a single asset into data/raw/ (returns the download dir)."""
-    DATA_RAW.mkdir(parents=True, exist_ok=True)
+    """Download a single asset into data/raw/<dandiset_id>/ (returns the dir)."""
+    out = raw_dir(dandiset_id)
     url = get_s3_url(filepath, dandiset_id, version)
     existing = DownloadExisting("skip") if skip_existing else DownloadExisting("overwrite")
-    download(url, str(DATA_RAW), existing=existing)
-    return DATA_RAW
+    download(url, str(out), existing=existing)
+    return out
 
 
 def download_all(dandiset_id: str = DANDISET_ID, version: str = DEFAULT_VERSION):
-    """Download the entire dandiset into data/raw/ (~33 GiB)."""
-    DATA_RAW.mkdir(parents=True, exist_ok=True)
+    """Download the entire dandiset into data/raw/<dandiset_id>/."""
+    out = raw_dir(dandiset_id)
     url = f"https://dandiarchive.org/dandiset/{dandiset_id}/{version}"
-    download(url, str(DATA_RAW), existing=DownloadExisting("skip"))
-    return DATA_RAW
+    download(url, str(out), existing=DownloadExisting("skip"))
+    return out
 
 
 def main() -> None:

@@ -19,12 +19,16 @@ epoch/condition/subject/region metadata so later stages stay rerunnable.
     trials, so each behavioral epoch is chopped into fixed-length segments.
 
 Usage:
-    pixi run python src/02_baseline_linear.py                 # all methods, all sessions
-    pixi run python src/02_baseline_linear.py --method pca dpca
-    pixi run python src/02_baseline_linear.py --method gpfa --session <asset-path>
-    pixi run python src/02_baseline_linear.py --bin-ms 1000
+    pixi run python src/000447/02_baseline_linear.py                 # all methods, all sessions
+    pixi run python src/000447/02_baseline_linear.py --method pca dpca
+    pixi run python src/000447/02_baseline_linear.py --method gpfa --session <asset-path>
+    pixi run python src/000447/02_baseline_linear.py --bin-ms 1000
 """
 from __future__ import annotations
+
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1] / "common"))
 
 import argparse
 from importlib import import_module
@@ -40,7 +44,7 @@ from config import (
     processed_path,
 )
 
-dl = import_module("00_download")  # stage-0 streaming helper (name starts with a digit)
+import download as dl              # stage-0 streaming helper from src/common
 
 # ----------------------------------------------------------------------------
 # PCA
