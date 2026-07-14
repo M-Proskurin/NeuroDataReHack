@@ -57,6 +57,25 @@ def load_rate_matrix(subject: str, region: str, bin_ms: int | None = None) -> di
     return dict(np.load(path, allow_pickle=False))
 
 
+def spatial_grid_labels(position: np.ndarray, n_grid: int = 8) -> np.ndarray:
+    """Integer 2-D occupancy-grid bin per timepoint; -1 where position is NaN.
+
+    Shared by stages that compare representations at matched spatial locations
+    (dPCA in stage 2, Procrustes/CCA in stage 4).
+    """
+    x, y = position[:, 0], position[:, 1]
+    valid = np.isfinite(x) & np.isfinite(y)
+    lab = np.full(x.shape, -1, dtype=int)
+    if valid.sum() == 0:
+        return lab
+    x0, x1 = np.percentile(x[valid], [0.5, 99.5])
+    y0, y1 = np.percentile(y[valid], [0.5, 99.5])
+    xi = np.clip(((x[valid] - x0) / max(x1 - x0, 1e-9) * n_grid).astype(int), 0, n_grid - 1)
+    yi = np.clip(((y[valid] - y0) / max(y1 - y0, 1e-9) * n_grid).astype(int), 0, n_grid - 1)
+    lab[valid] = xi * n_grid + yi
+    return lab
+
+
 def available_rate_matrices(bin_ms: int | None = None) -> list[tuple[str, str, Path]]:
     """List (subject, region, path) for stage-1 rate matrices at a given bin size."""
     bin_ms = bin_ms if bin_ms is not None else int(BIN_SIZE_S * 1000)

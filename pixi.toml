@@ -30,7 +30,7 @@ dandi = "*"
 spikeinterface = "*"
 
 # --- dimensionality reduction / manifolds ---
-scikit-learn = "*"
+scikit-learn = ">=1.6,<1.8"
 umap-learn = "*"
 ripser = "*"          # persistent homology
 
