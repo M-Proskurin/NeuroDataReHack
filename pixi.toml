@@ -43,5 +43,6 @@ cebra = "*"           # behavior-aligned nonlinear embedding (primary tool)
 elephant = "*"        # GPFA + spike-train tools
 remfile = ">=0.1.13, <0.2"
 dpca = ">=1.0.5, <2"
+track-linearization = ">=2.4.0, <3"
 # giotto-tda omitted: no py3.11/win-64 wheel (needs CMake source build).
 # Persistent homology is covered by `ripser` above.
