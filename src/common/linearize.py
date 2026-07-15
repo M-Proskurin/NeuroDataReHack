@@ -30,26 +30,29 @@ DWELL_SPEED = 3.0
 WELL_REFINE_RADIUS = 18.0
 
 
-def wells_from_trials(trials_df, pos_t: np.ndarray, pos_xy: np.ndarray) -> np.ndarray:
+def wells_from_trials(trials_df, pos_t: np.ndarray, pos_xy: np.ndarray,
+                      return_ids: bool = False):
     """Reward-well coordinates (n_wells, 2) from the trials table.
 
     At each trial's start/stop the animal is at start_well/end_well (reward), so
     each well's position is the median tracked position at those event times.
     This is far more reliable than clustering occupancy (which also piles up at
-    the choice point).
+    the choice point). With return_ids, also returns the well ids (sorted) — use
+    these to match arms across the novel and familiar tracks by identity.
     """
     ev_t, ev_w = [], []
     for col_t, col_w in [("start_time", "start_well"), ("stop_time", "end_well")]:
         ev_t.append(trials_df[col_t].to_numpy()); ev_w.append(trials_df[col_w].to_numpy())
     ev_t = np.concatenate(ev_t); ev_w = np.concatenate(ev_w)
     idx = np.searchsorted(pos_t, ev_t).clip(0, len(pos_t) - 1)
-    wells = []
+    wells, ids = [], []
     for w in np.unique(ev_w):
         p = pos_xy[idx[ev_w == w]]
         p = p[np.isfinite(p).all(axis=1)]
         if len(p):
-            wells.append(np.median(p, axis=0))
-    return np.asarray(wells)
+            wells.append(np.median(p, axis=0)); ids.append(w)
+    wells = np.asarray(wells)
+    return (wells, np.asarray(ids)) if return_ids else wells
 
 
 def _order_and_junctions(wells: np.ndarray, position: np.ndarray, arm_pctl: float = 97.0):
