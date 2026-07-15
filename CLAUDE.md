@@ -17,6 +17,7 @@ Reference paper: Shin & Jadhav, *Geometric transformation of cognitive maps for 
 ## Data
 - Each NWB file (000447): 3 behavioral epochs (novel W-track first exposure, then familiar epochs)
 - Each NWB file (000978): 8 behavioral sessions + interleaved sleep epochs (17 total) across a single day
+  - **Exception — ZT2:** subject ZT2 has *two* files (`obj-u40err`, `obj-1dss6zi`) that are **two separate recording days** (2024-05-02 and 2024-05-03), ~4 run sessions each — NOT one split day. Do not stitch them into an 8-session sequence. ZT2 is **excluded from the 6b learning-trajectory analysis**; its data stays usable for per-file stage 2/3 and 6c. Rate matrices are keyed by a filename-derived `session_key`, so ZT2 appears as two keys.
 - Variables (both): spike times (`Units`), LFP (`ElectricalSeries`), position/velocity (`SpatialSeries`), electrode metadata
 - Access via `pynwb`; consider `spikeinterface` for spike-sorted unit handling
 - Keep data organized by dandiset: `data/raw/000447/`, `data/raw/000978/` (gitignored) — do not commit raw data
@@ -37,7 +38,7 @@ Reference paper: Shin & Jadhav, *Geometric transformation of cognitive maps for 
 ### 000978-specific: within-day learning trajectory
 6b. **Session-sequence alignment** — align each of the 8 sessions' embeddings to the final (most-familiar) session; track alignment quality (Procrustes disparity / CCA correlation) as a function of session number to get a convergence time course, rather than a single before/after contrast
 6c. **Sleep epoch analysis** — embed or project sleep epochs into the awake-derived manifold to assess whether replay events sample the same geometric structure or a compressed/distorted version of it
-6d. Run 6b/6c separately for CA1 and PFC, and check consistency across the 8 animals
+6d. Run 6b/6c separately for CA1 and PFC, and check consistency across animals (6b: the 7 clean single-day animals, ZT2 excluded — see Data note)
 
 No cross-dandiset merging or alignment — each dandiset's pipeline runs independently end to end.
 
