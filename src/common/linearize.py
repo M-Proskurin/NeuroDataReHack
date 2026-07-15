@@ -27,6 +27,7 @@ from track_linearization import get_linearized_position, make_track_graph
 
 EDGE_SPACING = 15.0
 DWELL_SPEED = 3.0
+WELL_REFINE_RADIUS = 18.0
 
 
 def wells_from_trials(trials_df, pos_t: np.ndarray, pos_xy: np.ndarray) -> np.ndarray:
@@ -78,17 +79,37 @@ def _wells_from_occupancy(position, velocity, dwell_speed=DWELL_SPEED):
     return KMeans(n_clusters=3, n_init=10, random_state=0).fit(dwell).cluster_centers_
 
 
+def _refine_wells(wells: np.ndarray, position: np.ndarray, radius: float) -> np.ndarray:
+    """Snap each well to the local occupancy centroid (arm-tip centerline).
+
+    Reward-well LED positions sit on one edge of the arm loop; centering on the
+    surrounding occupancy removes that lateral offset so the graph node is on the
+    arm midline. radius <= 0 disables.
+    """
+    if radius <= 0:
+        return wells
+    P = position[np.isfinite(position).all(axis=1)]
+    out = []
+    for w in wells:
+        near = P[np.linalg.norm(P - w, axis=1) < radius]
+        out.append(near.mean(axis=0) if len(near) > 20 else w)
+    return np.asarray(out)
+
+
 def build_wtrack_graph(position: np.ndarray, velocity: np.ndarray | None = None,
-                       wells: np.ndarray | None = None):
+                       wells: np.ndarray | None = None,
+                       well_refine_radius: float = WELL_REFINE_RADIUS):
     """Build the W track graph in the data's coordinate frame.
 
     `wells` (n=3, x/y) should come from `wells_from_trials` when available (much
-    more reliable); otherwise a low-speed-occupancy fallback is used. Returns
-    (track_graph, edge_order, edge_spacing, nodes) where nodes is a dict of the
-    well/junction coordinates for plotting/QC.
+    more reliable); otherwise a low-speed-occupancy fallback is used. Wells are
+    then snapped to the local occupancy centerline (`well_refine_radius`) to undo
+    the reward-LED lateral offset. Returns (track_graph, edge_order, edge_spacing,
+    nodes) where nodes is a dict of the well/junction coordinates for QC.
     """
     if wells is None:
         wells = _wells_from_occupancy(position, velocity)
+    wells = _refine_wells(np.asarray(wells), position, well_refine_radius)
     wells, junc = _order_and_junctions(np.asarray(wells), position)
     # node ids: 0 center well, 1 left well, 2 right well, 3 center junc, 4 left junc, 5 right junc
     node_positions = np.array([wells[1], wells[0], wells[2], junc[1], junc[0], junc[2]])
