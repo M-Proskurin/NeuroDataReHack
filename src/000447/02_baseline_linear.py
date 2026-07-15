@@ -9,14 +9,19 @@ epoch/condition/subject/region metadata so later stages stay rerunnable.
 
   * **dPCA** (Kobak et al.) — *demixed* PCA that splits variance into parts that
     depend on space, on condition (novel/familiar), and their interaction. This
-    is the "factor out position/novelty variance explicitly" step. Continuous
-    W-track data has no trial structure, so we build the required factorial
-    tensor X[neuron, space-bin, condition] by averaging firing within a 2-D
-    spatial grid, keeping only grid bins visited under BOTH conditions.
+    is the "factor out position/novelty variance explicitly" step. Each **lap**
+    (a trials-table row) is a trial, so we build a genuine single-trial factorial
+    tensor trialX[lap, neuron, condition, space-bin] over a 2-D spatial grid
+    (bins visited by >=3 laps under BOTH conditions). That lets us fit dPCA with
+    cross-validated regularization (`regularizer='auto'`) and run a shuffle
+    `significance_analysis` — so the reported variance fractions are defensible,
+    not point estimates on an over-fit mean.
 
   * **GPFA** (elephant) — Gaussian-process factor analysis on the raw spike
-    trains (re-streamed from DANDI), giving smooth latent trajectories. Needs
-    trials, so each behavioral epoch is chopped into fixed-length segments.
+    trains (re-streamed from DANDI), giving smooth latent trajectories. Each lap
+    is one trial; the resulting latents are then re-expressed as a function of
+    **linearized track position** so trajectories are interpretable and
+    averageable across laps/conditions at matched positions.
 
 Usage:
     pixi run python src/000447/02_baseline_linear.py                 # all methods, all sessions
@@ -38,13 +43,21 @@ from sklearn.decomposition import PCA
 
 from config import (
     BIN_SIZE_S,
+    RANDOM_SEED,
     REGIONS,
     available_rate_matrices,
     load_rate_matrix,
     processed_path,
+    spatial_grid_labels,
 )
 
 import download as dl              # stage-0 streaming helper from src/common
+import lap_baselines as lb         # lap-resolved dPCA + GPFA helpers
+import linearize as lz             # W-track linearization for GPFA position index
+
+EPOCH_TABLE = "epoch intervals"
+N_GRID = 6                         # dPCA spatial grid (per side)
+N_POSBINS = 30                     # GPFA linear-position bins
 
 # ----------------------------------------------------------------------------
 # PCA
@@ -82,150 +95,146 @@ def run_pca(subject: str, region: str, bin_ms: int, n_keep: int = 20) -> "Path":
 
 
 # ----------------------------------------------------------------------------
-# dPCA
+# dPCA — lap-resolved (space x condition), cross-validated + significance
 # ----------------------------------------------------------------------------
 
-def _spatial_labels(position: np.ndarray, n_grid: int) -> np.ndarray:
-    """Integer 2-D-grid bin per timepoint (-1 where position is undefined)."""
-    x, y = position[:, 0], position[:, 1]
-    valid = np.isfinite(x) & np.isfinite(y)
-    lab = np.full(x.shape, -1, dtype=int)
-    if valid.sum() == 0:
-        return lab
-    (x0, x1) = np.percentile(x[valid], [0.5, 99.5])
-    (y0, y1) = np.percentile(y[valid], [0.5, 99.5])
-    xi = np.clip(((x[valid] - x0) / max(x1 - x0, 1e-9) * n_grid).astype(int), 0, n_grid - 1)
-    yi = np.clip(((y[valid] - y0) / max(y1 - y0, 1e-9) * n_grid).astype(int), 0, n_grid - 1)
-    lab[valid] = xi * n_grid + yi
-    return lab
+def run_dpca(nwb, subject: str, region: str, bin_ms: int,  # noqa: ANN001
+             n_perm: int = 200, n_components: int = 10) -> "Path | None":  # noqa: F821
+    """Demixed PCA over (condition x space) with laps as trials.
 
-
-def run_dpca(subject: str, region: str, bin_ms: int, n_grid: int = 8,
-             min_count: int = 5, n_components: int = 10) -> "Path | None":  # noqa: F821
-    """Demixed PCA over (space x condition); save per-marginalization variance."""
-    from dPCA import dPCA
-
+    Each lap gives one single-trial estimate per space bin; the regularizer is
+    chosen by lap-level cross-validation and the condition / condition x space
+    variance fractions are tested by permuting the condition label across laps.
+    labels='cs' -> marginalizations 'c' (condition), 's' (space), 'cs'
+    (interaction = map reshaping between novel and familiar).
+    """
     d = load_rate_matrix(subject, region, bin_ms)
-    rates = d["rates"].astype(np.float64)          # (T, N)
-    condition = d["condition"]
-    conds = sorted(np.unique(condition).tolist())  # e.g. ['familiar', 'novel']
-    if len(conds) < 2:
-        print(f"  dPCA {subject} {region}: <2 conditions, skipped")
+    space = spatial_grid_labels(d["position"], N_GRID)
+    lt = lb.lap_table(nwb.intervals["trials"].to_dataframe())
+    res = lb.lap_dpca(d["rates"], d["time"], space, d["condition"],
+                      lt["start"], lt["stop"], labels="cs",
+                      n_components=n_components, n_perm=n_perm, seed=RANDOM_SEED)
+    if res is None:
+        print(f"  dPCA {subject} {region}: too few lap-resolved cells, skipped")
         return None
-
-    labels = _spatial_labels(d["position"], n_grid)
-    # keep spatial bins sampled enough under EVERY condition (factorial design)
-    ok_bins = None
-    for c in conds:
-        cnt = np.bincount(labels[(condition == c) & (labels >= 0)],
-                          minlength=n_grid * n_grid)
-        good = cnt >= min_count
-        ok_bins = good if ok_bins is None else (ok_bins & good)
-    space = np.flatnonzero(ok_bins)
-    if space.size < 3:
-        print(f"  dPCA {subject} {region}: only {space.size} shared space bins, skipped")
-        return None
-
-    N = rates.shape[1]
-    X = np.zeros((N, space.size, len(conds)), dtype=np.float64)
-    for ci, c in enumerate(conds):
-        for si, s in enumerate(space):
-            m = (condition == c) & (labels == s)
-            X[:, si, ci] = rates[m].mean(axis=0)
-    X -= X.mean(axis=(1, 2), keepdims=True)        # center per neuron
-
-    k = int(min(n_components, N, X.shape[1] * X.shape[2] - 1))
-    dpca = dPCA.dPCA(labels="sc", n_components=k, regularizer=None)
-    dpca.protect = None
-    Z = dpca.fit_transform(X)
-    evr = dpca.explained_variance_ratio_
+    Z, evr, reg, pv = res["Z"], res["evr"], res["regularizer"], res["pvals"]
+    groups, kept_space, n_laps = res["groups"], res["space"], res["n_laps"]
+    N = int(d["rates"].shape[1])
 
     out = processed_path(f"dpca_{subject}_{region}_{bin_ms}ms.npz")
     np.savez_compressed(
         out,
-        Z_s=Z["s"].astype(np.float32), Z_c=Z["c"].astype(np.float32),
-        Z_sc=Z["sc"].astype(np.float32),
-        evr_s=np.asarray(evr["s"], dtype=np.float32),
-        evr_c=np.asarray(evr["c"], dtype=np.float32),
-        evr_sc=np.asarray(evr["sc"], dtype=np.float32),
-        space_bins=space.astype(np.int64), conditions=np.asarray(conds),
-        n_grid=np.asarray(n_grid), n_units=np.asarray(N),
+        Z_c=Z["c"], Z_s=Z["s"], Z_cs=Z["cs"],
+        evr_c=evr["c"], evr_s=evr["s"], evr_cs=evr["cs"],
+        p_c=np.asarray(pv["c"]), p_cs=np.asarray(pv["cs"]),
+        regularizer=np.asarray(reg), n_laps=np.asarray(n_laps),
+        space_bins=kept_space.astype(np.int64), conditions=np.asarray(groups),
+        n_grid=np.asarray(N_GRID), n_units=np.asarray(N),
         subject=np.asarray(subject), region=np.asarray(region),
         bin_size_s=d["bin_size_s"],
     )
-    frac = {m: float(np.sum(evr[m])) for m in ("s", "c", "sc")}
-    print(f"  dPCA {subject} {region}: {N} units, {space.size} space bins x "
-          f"{len(conds)} cond -> var space={frac['s']:.2f} "
-          f"cond={frac['c']:.2f} interact={frac['sc']:.2f} -> {out.name}")
+    o = res["obs"]
+    print(f"  dPCA {subject} {region}: {kept_space.size} bins x {len(groups)} cond, "
+          f"{n_laps} laps, reg={reg:.1e} -> var space={o['s']:.2f} "
+          f"cond={o['c']:.2f} (p={pv['c']:.3f}) interact={o['cs']:.2f} "
+          f"(p={pv['cs']:.3f}) -> {out.name}")
     return out
 
 
 # ----------------------------------------------------------------------------
-# GPFA
+# GPFA — lap trials, latents indexed by linearized track position
 # ----------------------------------------------------------------------------
 
-def _epoch_conditions(nwb, n_epochs):  # noqa: ANN001
+def _lin_series_by_condition(nwb, lt):  # noqa: ANN001
+    """Per-condition linearized position over the SpatialSeries clock.
+
+    Novel and familiar are physically different mazes, so each condition gets its
+    own W graph (wells from that condition's laps); linear position is comparable
+    across them because build_wtrack_graph uses a fixed edge order/spacing.
+    Returns (pos_t, {condition: linear_position}, lap_condition_fn).
+    """
     ex = import_module("01_extraction")
-    return ex.epoch_conditions(nwb.session_description, n_epochs)
+    epochs = nwb.intervals[EPOCH_TABLE].to_dataframe().reset_index(drop=True)
+    conds = ex.epoch_conditions(nwb.session_description, len(epochs))
+    ss = nwb.processing["behavior"].data_interfaces["Position"].spatial_series["SpatialSeries"]
+    pos_t = np.asarray(ss.timestamps[:]); pos_xy = np.asarray(ss.data[:])[:, :2]
+    trials_df = nwb.intervals["trials"].to_dataframe().reset_index(drop=True)
+    lap_start = lt["start"]
+
+    def lap_condition(t0: float):
+        for e, row in epochs.iterrows():
+            if row.start_time <= t0 < row.stop_time:
+                return conds[e]
+        return None
+
+    lin_series = {}
+    for c in sorted(set(conds)):
+        ep_c = epochs[[conds[e] == c for e in range(len(epochs))]]
+        in_c = np.zeros(len(trials_df), bool)
+        for _, row in ep_c.iterrows():
+            in_c |= (trials_df.start_time.to_numpy() >= row.start_time) & \
+                    (trials_df.start_time.to_numpy() < row.stop_time)
+        wells = lz.wells_from_trials(trials_df[in_c], pos_t, pos_xy)
+        if len(wells) < 3:
+            continue
+        pos_in_c = np.zeros(len(pos_t), bool)
+        for _, row in ep_c.iterrows():
+            pos_in_c |= (pos_t >= row.start_time) & (pos_t < row.stop_time)
+        g, eo, sp, _ = lz.build_wtrack_graph(pos_xy[pos_in_c], wells=wells)
+        lin, _ = lz.linearize_position(pos_xy, g, eo, sp)
+        lin_series[c] = lin
+    return pos_t, lin_series, lap_condition
 
 
-def _gpfa_trials(nwb, region: str, trial_len_s: float):  # noqa: ANN001
-    """Chop each epoch into fixed-length trials of neo.SpikeTrains for one region."""
-    import neo
-    import quantities as pq
-
+def run_gpfa(nwb, subject: str, region: str, x_dim: int = 6,
+             gpfa_bin_ms: int = 100, min_lap_s: float = 6.0,
+             em_max_iters: int = 50) -> "Path | None":  # noqa: F821
+    """Fit GPFA with one trial per lap; index latents by linearized position."""
     ex = import_module("01_extraction")
     regions = ex.unit_regions(nwb)
     unit_idx = np.flatnonzero(regions == region)
     spike_times = [np.asarray(nwb.units["spike_times"][int(i)]) for i in unit_idx]
 
-    epochs = nwb.intervals[ex.EPOCH_TABLE].to_dataframe().reset_index(drop=True)
-    conds = _epoch_conditions(nwb, len(epochs))
-
-    trials, tr_epoch, tr_cond = [], [], []
-    for e, row in epochs.iterrows():
-        s, t = float(row["start_time"]), float(row["stop_time"])
-        n = int(np.floor((t - s) / trial_len_s))
-        for k in range(n):
-            w0 = s + k * trial_len_s
-            trial = []
-            for st in spike_times:
-                seg = st[(st >= w0) & (st < w0 + trial_len_s)] - w0
-                trial.append(neo.SpikeTrain(seg * pq.s, t_start=0 * pq.s,
-                                            t_stop=trial_len_s * pq.s))
-            trials.append(trial)
-            tr_epoch.append(e)
-            tr_cond.append(conds[e])
-    return trials, np.asarray(tr_epoch, dtype=np.int16), np.asarray(tr_cond), unit_idx
-
-
-def run_gpfa(nwb, subject: str, region: str, x_dim: int = 8,
-             gpfa_bin_ms: int = 100, trial_len_s: float = 5.0,
-             em_max_iters: int = 50) -> "Path | None":  # noqa: F821
-    """Fit GPFA on re-streamed spike trains; save latent trajectories per trial."""
-    import quantities as pq
-    from elephant.gpfa import GPFA
-
-    trials, tr_epoch, tr_cond, unit_idx = _gpfa_trials(nwb, region, trial_len_s)
+    lt = lb.lap_table(nwb.intervals["trials"].to_dataframe())
+    trials, kept = lb.build_lap_spiketrains(spike_times, lt["start"], lt["stop"], min_lap_s)
     if len(trials) < 5 or unit_idx.size <= x_dim:
-        print(f"  GPFA {subject} {region}: too few trials/units, skipped")
+        print(f"  GPFA {subject} {region}: too few laps/units, skipped")
         return None
 
-    gpfa = GPFA(bin_size=gpfa_bin_ms * pq.ms, x_dim=x_dim, em_max_iters=em_max_iters)
-    trajs = gpfa.fit_transform(trials)             # list of (x_dim, n_bins)
-    latents = np.stack(trajs, axis=0).astype(np.float32)  # (n_trials, x_dim, n_bins)
+    pos_t, lin_series, lap_condition = _lin_series_by_condition(nwb, lt)
+    lap_cond = np.array([lap_condition(lt["start"][i]) for i in kept], dtype="<U8")
+
+    def linpos_of_lap(bc, li):
+        s = lin_series.get(lap_condition(lt["start"][li]))
+        if s is None:
+            return np.full(len(bc), np.nan)
+        fin = np.isfinite(s)
+        return np.interp(bc, pos_t[fin], s[fin], left=np.nan, right=np.nan)
+
+    all_lin = np.concatenate([s[np.isfinite(s)] for s in lin_series.values()])
+    lin_edges = np.linspace(0.0, float(np.nanmax(all_lin)), N_POSBINS + 1)
+
+    trajs = lb.fit_gpfa_laps(trials, x_dim=x_dim, gpfa_bin_ms=gpfa_bin_ms,
+                             em_max_iters=em_max_iters)
+    latents = lb.position_index_latents(trajs, kept, lt["start"], linpos_of_lap,
+                                        gpfa_bin_ms, lin_edges)
 
     out = processed_path(f"gpfa_{subject}_{region}.npz")
     np.savez_compressed(
         out,
-        latents=latents, trial_epoch=tr_epoch, trial_condition=tr_cond,
+        latents_posidx=latents,                    # (n_laps, x_dim, n_posbins)
+        posbin_centers=(0.5 * (lin_edges[:-1] + lin_edges[1:])).astype(np.float32),
+        lap_condition=lap_cond, lap_index=kept.astype(np.int64),
+        trajectory_type=lt["trajectory_type"][kept],
+        start_well=lt["start_well"][kept], end_well=lt["end_well"][kept],
         unit_ids=np.asarray(nwb.units.id[:])[unit_idx].astype(np.int64),
         x_dim=np.asarray(x_dim), gpfa_bin_ms=np.asarray(gpfa_bin_ms),
-        trial_len_s=np.asarray(trial_len_s),
+        min_lap_s=np.asarray(min_lap_s),
         subject=np.asarray(subject), region=np.asarray(region),
     )
-    print(f"  GPFA {subject} {region}: {latents.shape[0]} trials x {x_dim} dims "
-          f"x {latents.shape[2]} bins -> {out.name}")
+    cov = float(np.mean(np.isfinite(latents).any(axis=1)))
+    print(f"  GPFA {subject} {region}: {latents.shape[0]} laps x {x_dim} dims x "
+          f"{N_POSBINS} pos-bins ({cov*100:.0f}% cells covered) -> {out.name}")
     return out
 
 
@@ -254,33 +263,33 @@ def main() -> None:
                         help="rate-matrix bin size for PCA/dPCA")
     parser.add_argument("--regions", nargs="+", default=list(REGIONS),
                         choices=list(REGIONS))
-    parser.add_argument("--gpfa-xdim", type=int, default=8)
+    parser.add_argument("--gpfa-xdim", type=int, default=6)
     args = parser.parse_args()
 
-    # PCA / dPCA operate on saved rate matrices
     matrices = [(s, r, p) for (s, r, p) in available_rate_matrices(args.bin_ms)
                 if r in args.regions]
-    if "pca" in args.method or "dpca" in args.method:
-        print(f"PCA/dPCA on {len(matrices)} rate matrices (bin={args.bin_ms}ms)")
-        for subject, region, _ in matrices:
-            if "pca" in args.method:
-                run_pca(subject, region, args.bin_ms)
-            if "dpca" in args.method:
-                run_dpca(subject, region, args.bin_ms)
 
-    # GPFA re-streams spike trains per session
-    if "gpfa" in args.method:
+    # PCA operates purely on saved rate matrices
+    if "pca" in args.method:
+        print(f"PCA on {len(matrices)} rate matrices (bin={args.bin_ms}ms)")
+        for subject, region, _ in matrices:
+            run_pca(subject, region, args.bin_ms)
+
+    # dPCA (needs the trials table for laps) and GPFA both re-stream the session
+    if "dpca" in args.method or "gpfa" in args.method:
         s2a = _subject_to_asset()
         subjects = sorted({s for (s, r, _) in matrices})
         assets = args.session or [s2a[s] for s in subjects if s in s2a]
-        print(f"GPFA on {len(assets)} session(s), regions={args.regions}, "
-              f"x_dim={args.gpfa_xdim}")
+        print(f"dPCA/GPFA on {len(assets)} session(s), regions={args.regions}")
         for asset in assets:
             print(asset)
             with dl.stream_nwb(asset) as nwb:
                 subject = getattr(nwb.subject, "subject_id", "unknown")
                 for region in args.regions:
-                    run_gpfa(nwb, subject, region, x_dim=args.gpfa_xdim)
+                    if "dpca" in args.method:
+                        run_dpca(nwb, subject, region, args.bin_ms)
+                    if "gpfa" in args.method:
+                        run_gpfa(nwb, subject, region, x_dim=args.gpfa_xdim)
 
 
 if __name__ == "__main__":
