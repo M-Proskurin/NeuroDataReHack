@@ -30,7 +30,12 @@ Reference paper: Shin & Jadhav, *Geometric transformation of cognitive maps for 
 2. **Baseline linear** — PCA, GPFA, dPCA (factor out position/novelty/session/epoch variance explicitly)
 3. **Nonlinear embedding** — CEBRA (behavior-aligned, primary tool), Isomap/UMAP/PHATE as comparisons
 4. **Topology check (optional)** — persistent homology (`ripser`/`giotto-tda`) to confirm ring/toroidal structure
-5. **Dimensionality selection** — cross-validated reconstruction error (leave-neuron-out), not just scree plots
+5. **Dimensionality estimation** — don't rely on a single method; triangulate:
+   - **TwoNN** (Facco et al. 2017) as the primary model-free intrinsic dimensionality estimate — robust to curvature/noise, no fitting required
+   - **Decoding-vs-dimension curve** — sweep CEBRA latent dimension, track decoding accuracy for position/novelty/session; take the saturation point
+   - **Isomap residual variance vs. dimension** — secondary check, already computing Isomap for topology
+   - **PCA participation ratio** — report as an upper bound only (linear methods overestimate dimensionality of curved manifolds); the gap vs. TwoNN is itself informative about curvature
+   - Run estimators on held-out/cross-validated data, not the full dataset — noisy spike rates otherwise inflate the estimate
 
 ### 000447-specific: novel vs. familiar comparison
 6a. Procrustes/CCA between novel vs. familiar embeddings, and between CA1 vs. PFC embeddings
