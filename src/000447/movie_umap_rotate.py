@@ -57,19 +57,20 @@ def main() -> None:
     if args.color_by == "position":
         lin, _ = lz.linearize_position(pos[m], graph, eo, sp)
         ok = np.isfinite(lin) & np.isfinite(pos[m]).all(axis=1)
-        E, L, labels = emb[m][ok], lin[ok], None
+        E, L, labels, frac = emb[m][ok], lin[ok], None, None
     else:
         rm = load_rate_matrix(args.subject, "CA1", BIN_MS, DANDISET)
         cc = rm["condition"] == args.condition
-        lab, _ = tl.masked_labels(rm["position"][cc], rm["time"][cc], rm["velocity"][cc], nodes)
+        lab, fr, _ = tl.masked_labels(rm["position"][cc], rm["time"][cc], rm["velocity"][cc], nodes)
         assert len(lab) == int(m.sum()), f"align {len(lab)} vs {int(m.sum())}"
         ok = np.isfinite(pos[m]).all(axis=1)
-        E, L, labels = emb[m][ok], None, lab[ok]
+        E, L, labels, frac = emb[m][ok], None, lab[ok], fr[ok]
 
     if len(E) > args.max_points:
         sel = np.random.default_rng(0).choice(len(E), args.max_points, replace=False)
         E = E[sel]; L = None if L is None else L[sel]
         labels = None if labels is None else labels[sel]
+        frac = None if frac is None else frac[sel]
 
     fig = plt.figure(figsize=(6.6, 6.0))
     ax = fig.add_subplot(111, projection="3d")
@@ -78,12 +79,12 @@ def main() -> None:
         cb = fig.colorbar(sc, ax=ax, shrink=0.6, pad=0.1); cb.set_label("linearized track position (cm)")
         tag = ""
     else:
-        for lb in ["base"] + list(tl.LABELS6):
-            s = labels == lb
-            if s.any():
-                ax.scatter(E[s, 0], E[s, 1], E[s, 2], color=tl.ARM_COLORS[lb], s=7,
-                           alpha=0.35 if lb == "base" else 0.8, label=lb)
-        ax.legend(markerscale=2, fontsize=7, loc="upper left", title="arm · direction")
+        colors = tl.point_colors(labels, frac)
+        base = labels == "base"
+        ax.scatter(E[base, 0], E[base, 1], E[base, 2], color=tl.BASE_COLOR, s=7, alpha=0.3)
+        ax.scatter(E[~base, 0], E[~base, 1], E[~base, 2], c=colors[~base], s=7, alpha=0.8)
+        ax.legend(handles=tl.legend_handles(), fontsize=7, loc="upper left",
+                  title="arm · direction\n(dark=base → bright=well)")
         tag = "_arms"
     ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2"); ax.set_zlabel("UMAP 3")
     ax.set_title(f"{args.subject} CA1 ({args.condition}) — UMAP 3-D (50 ms)")

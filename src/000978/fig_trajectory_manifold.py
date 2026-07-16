@@ -112,10 +112,11 @@ def make_figure(key, asset, region, color_by):
             payload = ("position", lin)
         else:
             Pb, Tb, Vb, Sb = run_epoch_behavior_bins(nwb)
-            labels_masked, mmask = tl.masked_labels(Pb, Tb, Vb, nodes)
-            lab_last = labels_masked[Sb[mmask] == last]
+            labels_masked, frac_masked, mmask = tl.masked_labels(Pb, Tb, Vb, nodes)
+            keep = Sb[mmask] == last
+            lab_last, frac_last = labels_masked[keep], frac_masked[keep]
             assert len(lab_last) == int(m.sum()), f"align {len(lab_last)} vs {int(m.sum())}"
-            payload = ("trajtype", lab_last)
+            payload = ("trajtype", lab_last, frac_last)
 
     ok = np.isfinite(pos[m]).all(axis=1)
     P, E = pos[m][ok], emb[m][ok]
@@ -132,16 +133,16 @@ def make_figure(key, asset, region, color_by):
         sub = "shared colour = linearized position"
         tag = ""
     else:
-        labels = payload[1][ok]
-        for lab in ["base"] + list(tl.LABELS6):
-            s = labels == lab
-            if not s.any():
-                continue
-            a = 0.35 if lab == "base" else 0.85
-            ax0.scatter(P[s, 0], P[s, 1], color=tl.ARM_COLORS[lab], s=6, alpha=a, label=lab)
-            ax1.scatter(E[s, 0], E[s, 1], E[s, 2], color=tl.ARM_COLORS[lab], s=6, alpha=a * 0.85)
-        ax0.legend(markerscale=2, fontsize=8, loc="upper right", title="arm · direction")
-        sub = "arm × direction (in = toward well, out = toward base)"
+        labels, frac = payload[1][ok], payload[2][ok]
+        colors = tl.point_colors(labels, frac)
+        base = labels == "base"
+        ax0.scatter(P[base, 0], P[base, 1], color=tl.BASE_COLOR, s=6, alpha=0.3)
+        ax0.scatter(P[~base, 0], P[~base, 1], c=colors[~base], s=6, alpha=0.9)
+        ax1.scatter(E[base, 0], E[base, 1], E[base, 2], color=tl.BASE_COLOR, s=6, alpha=0.25)
+        ax1.scatter(E[~base, 0], E[~base, 1], E[~base, 2], c=colors[~base], s=6, alpha=0.8)
+        ax0.legend(handles=tl.legend_handles(), fontsize=8, loc="upper right",
+                   title="arm · direction\n(dark=base → bright=well)")
+        sub = "arm × direction, shaded by location (in = toward well, out = toward base)"
         tag = "_arms"
     ax0.set_aspect("equal"); ax0.set_xlabel("x (cm)"); ax0.set_ylabel("y (cm)")
     ax0.set_title(f"Track trajectory — {key} {region} (session {last})")

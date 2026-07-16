@@ -91,25 +91,23 @@ def _plot_position(P, E, L, subject, condition, bin_ms):
     return fig
 
 
-def _plot_trajtype(P, E, labels, subject, condition, bin_ms):
-    draw = ["base"] + [c for c in tl.LABELS6]         # base first (background)
+def _plot_trajtype(P, E, labels, frac, subject, condition, bin_ms):
+    colors = tl.point_colors(labels, frac)
+    base = labels == "base"
     fig = plt.figure(figsize=(13, 5.6))
     ax0 = fig.add_subplot(1, 2, 1)
     ax1 = fig.add_subplot(1, 2, 2, projection="3d")
-    for lab in draw:
-        s = labels == lab
-        if not s.any():
-            continue
-        col = tl.ARM_COLORS[lab]
-        a = 0.35 if lab == "base" else 0.85
-        ax0.scatter(P[s, 0], P[s, 1], color=col, s=6, alpha=a, label=lab)
-        ax1.scatter(E[s, 0], E[s, 1], E[s, 2], color=col, s=6, alpha=a * 0.85)
+    ax0.scatter(P[base, 0], P[base, 1], color=tl.BASE_COLOR, s=6, alpha=0.3)
+    ax0.scatter(P[~base, 0], P[~base, 1], c=colors[~base], s=6, alpha=0.9)
+    ax1.scatter(E[base, 0], E[base, 1], E[base, 2], color=tl.BASE_COLOR, s=6, alpha=0.25)
+    ax1.scatter(E[~base, 0], E[~base, 1], E[~base, 2], c=colors[~base], s=6, alpha=0.8)
     ax0.set_aspect("equal"); ax0.set_xlabel("x (cm)"); ax0.set_ylabel("y (cm)")
     ax0.set_title(f"Track trajectory — {subject} CA1 ({condition})")
     ax1.set_xlabel("UMAP 1"); ax1.set_ylabel("UMAP 2"); ax1.set_zlabel("UMAP 3")
     ax1.set_title(f"CA1 activity manifold (UMAP 3-D, {bin_ms} ms)")
-    ax0.legend(markerscale=2, fontsize=8, loc="upper right", title="arm · direction")
-    fig.suptitle("Arm × direction (in = toward well, out = toward base) — track ↔ manifold",
+    ax0.legend(handles=tl.legend_handles(), fontsize=8, loc="upper right",
+               title="arm · direction\n(dark=base → bright=well)")
+    fig.suptitle("Arm × direction, shaded by location (in = toward well, out = toward base)",
                  fontsize=12)
     return fig
 
@@ -149,10 +147,11 @@ def main() -> None:
     else:
         rm = load_rate_matrix(args.subject, "CA1", bin_ms, DANDISET)
         cc = rm["condition"] == args.condition
-        labels, _ = tl.masked_labels(rm["position"][cc], rm["time"][cc], rm["velocity"][cc], nodes)
+        labels, frac, _ = tl.masked_labels(rm["position"][cc], rm["time"][cc], rm["velocity"][cc], nodes)
         assert len(labels) == int(m.sum()), f"align mismatch {len(labels)} vs {int(m.sum())}"
         ok = np.isfinite(pos[m]).all(axis=1)
-        fig = _plot_trajtype(pos[m][ok], emb[m][ok], labels[ok], args.subject, args.condition, bin_ms)
+        fig = _plot_trajtype(pos[m][ok], emb[m][ok], labels[ok], frac[ok],
+                             args.subject, args.condition, bin_ms)
         out = outdir / f"traj_manifold_000447_CA1_{args.subject}_{args.condition}_{bin_ms}ms_arms.png"
 
     fig.savefig(out, dpi=140, bbox_inches="tight"); plt.close(fig)
