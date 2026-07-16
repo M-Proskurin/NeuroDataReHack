@@ -1,4 +1,4 @@
-# NeuroData ReHack — Project Report
+# Reshaping the Cognitive Map: CA1–PFC Manifold Geometry Across Novelty and Learning
 
 ## Project Description
 Population-geometry ("cognitive map") analysis of hippocampal CA1 and prefrontal
