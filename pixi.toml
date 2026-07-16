@@ -37,6 +37,7 @@ ripser = "*"          # persistent homology
 # --- deep-learning backend for CEBRA (CPU build) ---
 pytorch = "*"
 numexpr = ">=2.14.1,<3"
+plotly = ">=6.9.0,<7"
 
 [pypi-dependencies]
 cebra = "*"           # behavior-aligned nonlinear embedding (primary tool)
