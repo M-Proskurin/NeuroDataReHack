@@ -151,7 +151,7 @@ def analyze_subject(subject, asset, method, rng):
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--method", default="umap", choices=["umap", "cebra"])
+    ap.add_argument("--method", default="umap", choices=["umap", "cebra", "cebratime"])
     args = ap.parse_args()
 
     assets = _subject_assets()

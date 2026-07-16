@@ -12,12 +12,14 @@ changes to those scripts. Each file carries `position` and the condition
 (000447) or `run_session` (000978) labels the downstream comparisons need.
 
 CEBRA note: speed-filtering breaks strict temporal contiguity, so CEBRA's
-time-contrastive sampling is approximate here; CEBRA is the position-baked-in
-reference anyway (the unsupervised UMAP embedding carries the honest signal).
+time-contrastive sampling is approximate here. Two CEBRA variants are available:
+`cebra` (supervised, behaviour-aligned) has position baked in and looks
+artificially converged; `cebratime` (unsupervised CEBRA-Time, no labels) is the
+honest comparison alongside UMAP.
 
 Usage:
-    pixi run python src/common/embed_smoothed.py --dandiset 000447 --method umap cebra
-    pixi run python src/common/embed_smoothed.py --dandiset 000978 --method umap cebra
+    pixi run python src/common/embed_smoothed.py --dandiset 000447 --method umap cebra cebratime
+    pixi run python src/common/embed_smoothed.py --dandiset 000978 --method umap cebra cebratime
 """
 from __future__ import annotations
 
@@ -56,13 +58,19 @@ def _fit(method, X, pos, vel):
         import umap
         return umap.UMAP(n_components=DIM, n_neighbors=30, min_dist=0.1,
                          random_state=0).fit_transform(X), None
-    if method == "cebra":
+    if method in ("cebra", "cebratime"):
         from cebra import CEBRA
+        # cebra = supervised (behaviour-aligned, conditional=time_delta);
+        # cebratime = unsupervised CEBRA-Time (conditional=time, no labels).
+        conditional = "time_delta" if method == "cebra" else "time"
         model = CEBRA(model_architecture="offset10-model", batch_size=512,
                       learning_rate=3e-4, output_dimension=DIM,
-                      max_iterations=CEBRA_ITERS, conditional="time_delta",
+                      max_iterations=CEBRA_ITERS, conditional=conditional,
                       distance="cosine", device="cpu", verbose=False)
-        model.fit(X, _behavior(pos, vel))
+        if method == "cebra":
+            model.fit(X, _behavior(pos, vel))
+        else:
+            model.fit(X)
         return model.transform(X), np.asarray(model.state_dict_["loss"], np.float32)
     raise ValueError(method)
 
@@ -71,7 +79,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dandiset", required=True, choices=["000447", "000978"])
-    ap.add_argument("--method", nargs="+", default=["umap", "cebra"], choices=["umap", "cebra"])
+    ap.add_argument("--method", nargs="+", default=["umap", "cebra"],
+                    choices=["umap", "cebra", "cebratime"])
     args = ap.parse_args()
     label_key = "condition" if args.dandiset == "000447" else "run_session"
 

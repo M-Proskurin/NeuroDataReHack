@@ -125,7 +125,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--method", nargs="+", default=["cebra", "umap", "isomap"],
-                        choices=["cebra", "umap", "isomap"])
+                        choices=["cebra", "cebratime", "umap", "isomap"])
     parser.add_argument("--bin-ms", type=int, default=int(BIN_SIZE_S * 1000))
     args = parser.parse_args()
 
