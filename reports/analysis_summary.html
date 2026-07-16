@@ -17,7 +17,69 @@
 
 <h1>NeuroData ReHack — analysis summary</h1>
 <p><em>Manifold / dimensionality-reduction analysis of two DANDI dandisets from the
-Jadhav lab (Shin &amp; Jadhav 2023), analyzed in parallel. Generated 2026-07-15.</em></p>
+Jadhav lab (Shin &amp; Jadhav 2023), analyzed in parallel. Generated 2026-07-16.</em></p>
+
+<h2>Project description</h2>
+<p>Population-geometry ("cognitive map") analysis of hippocampal CA1 and
+prefrontal (PFC) ensemble recordings from the Jadhav lab, using manifold and
+dimensionality-reduction methods. Two W-track dandisets from the same lab are
+analyzed <b>in parallel, not merged</b>: one probing how the map differs between
+<b>novel and familiar</b> environments, the other how it evolves as an animal
+<b>learns</b> a new environment across a single day. CA1 and PFC are always
+processed separately.</p>
+
+<h2>Dandisets used</h2>
+<ul>
+<li><a href="https://dandiarchive.org/dandiset/000978">000978</a> — "Single Day
+W-Track Learning" (CA1+PFC, 8 subjects; run sessions interleaved with sleep
+across one day).</li>
+<li><a href="https://dandiarchive.org/dandiset/000447">000447</a> —
+"Novel-familiar-novel WTrack (CA1-PFC)" (CA1+PFC, 5 subjects; novel then familiar
+epochs).</li>
+</ul>
+
+<h2>Objectives &amp; approach</h2>
+<p><b>Questions.</b> (000447) How does the population geometry transform between
+novel and familiar contexts, and how do CA1 and PFC relate? (000978) How does the
+manifold evolve session-by-session during learning — does it change its
+dimensionality or just its shape?</p>
+<p><b>Approach.</b> Data are streamed lazily from DANDI. A common per-dandiset
+pipeline runs: (1) time-binned rate matrices carrying position and
+epoch/condition/session labels; (2) linear baselines — PCA, lap-resolved dPCA
+(cross-validated regularization + permutation significance), GPFA with latents
+indexed by linearized track position; (3) nonlinear embeddings — UMAP and CEBRA
+(supervised and unsupervised CEBRA-Time) on a validated 50 ms / smoothed /
+speed-filtered representation; (4) geometry comparison via Procrustes/CCA on
+position-matched centroids, with tracks <b>linearized onto a common W topology</b>
+so different physical mazes are comparable; (5) intrinsic-dimensionality
+triangulation — TwoNN, PCA participation ratio, Isomap residual variance, and a
+decoding-vs-dimension curve, all cross-validated. Details and figures follow.</p>
+
+<h2>Progress &amp; next steps</h2>
+<p><b>Done.</b> (000447) In track-relative coordinates the novel/familiar maps
+show a <b>spatially-structured transformation</b> — shared geometry plus real
+reshaping (disparity ≈0.55–0.59 vs. ~0.90 null on the unsupervised UMAP and
+CEBRA-Time embeddings), and dPCA confirms a significant space×condition remap in
+every animal. (000978) The manifold <b>converges monotonically</b> toward its
+final-session geometry across the day, robust to bin size, embedding, region, and
+binning scheme. (Dimensionality) Both maps are <b>low-dimensional and curved</b>
+(TwoNN/Isomap ~3–5 vs. a much higher linear participation ratio); intrinsic
+dimensionality is largely unchanged by familiarisation and stable (~3)
+within-session across learning — so learning/novelty <b>reshape the geometry of a
+fixed-low-dimensional map</b> rather than change its dimensionality.</p>
+<p><b>Next steps.</b> Topology (persistent homology / ripser) to test the W/ring
+structure and its preservation across the transformation; CA1↔PFC comparison in
+linearized coordinates; 000978 sleep/replay via SWR-triggered sequence decoding;
+per-animal vs. pooled alignment and cross-animal consistency.</p>
+
+<h2>Background &amp; references</h2>
+<p>Reference paper: Shin &amp; Jadhav, <em>Geometric transformation of cognitive
+maps for generalization across hippocampal-prefrontal circuits</em>, Cell Reports
+2023 (DOI: 10.1016/j.celrep.2023.112246). Methods: CEBRA (Schneider et al. 2023),
+TwoNN (Facco et al. 2017), dPCA (Kobak et al. 2016), GPFA (Yu et al. 2009),
+bi-cross-validation (Owen &amp; Perry 2009). Tooling: <code>pynwb</code>,
+<code>dandi</code>, <code>scikit-learn</code>, <code>umap-learn</code>,
+<code>cebra</code>, <code>elephant</code>, <code>track_linearization</code>.</p>
 
 <div class="key"><b>Headlines.</b> (000447) The novel and familiar W-tracks are
 different mazes; compared at matched track-relative positions, the cognitive maps
