@@ -96,10 +96,14 @@ def run_epoch_behavior_bins(nwb):
     return np.vstack(Pb), np.concatenate(Tb), np.concatenate(Vb), np.concatenate(Sb)
 
 
-def make_figure(key, asset, region, color_by):
-    f = processed_dir(DANDISET) / f"emb_umap_{key}_{region}_{BIN_MS}ms.npz"
+METHOD_LABEL = {"umap": "UMAP", "cebra": "CEBRA (supervised)", "cebratime": "CEBRA-Time"}
+METHOD_AXIS = {"umap": "UMAP", "cebra": "CEBRA", "cebratime": "CEBRA-Time"}
+
+
+def make_figure(key, asset, region, color_by, method="umap"):
+    f = processed_dir(DANDISET) / f"emb_{method}_{key}_{region}_{BIN_MS}ms.npz"
     if not f.exists():
-        print(f"  {key} {region}: no embedding, skipped"); return None
+        print(f"  {key} {region}: no {method} embedding, skipped"); return None
     d = np.load(f, allow_pickle=False)
     emb, pos, rs = d["embedding"], d["position"], d["run_session"]
     last = int(rs.max())
@@ -146,13 +150,14 @@ def make_figure(key, asset, region, color_by):
         tag = "_arms"
     ax0.set_aspect("equal"); ax0.set_xlabel("x (cm)"); ax0.set_ylabel("y (cm)")
     ax0.set_title(f"Track trajectory — {key} {region} (session {last})")
-    ax1.set_xlabel("UMAP 1"); ax1.set_ylabel("UMAP 2"); ax1.set_zlabel("UMAP 3")
-    ax1.set_title(f"{region} activity manifold (UMAP 3-D, {BIN_MS} ms)")
+    axl = METHOD_AXIS[method]
+    ax1.set_xlabel(f"{axl} 1"); ax1.set_ylabel(f"{axl} 2"); ax1.set_zlabel(f"{axl} 3")
+    ax1.set_title(f"{region} activity manifold ({METHOD_LABEL[method]} 3-D, {BIN_MS} ms)")
     fig.suptitle(f"000978 {key} — last session: track ↔ neural-manifold ({sub})", fontsize=12)
 
     outdir = REPO_ROOT / "reports" / "figures"
     outdir.mkdir(parents=True, exist_ok=True)
-    out = outdir / f"traj_manifold_000978_{region}_{key}_sess{last}_{BIN_MS}ms{tag}.png"
+    out = outdir / f"traj_manifold_000978_{region}_{key}_sess{last}_{method}_{BIN_MS}ms{tag}.png"
     fig.savefig(out, dpi=140, bbox_inches="tight"); plt.close(fig)
     print(f"  {key} {region} [{color_by}]: session {last}, {int(m.sum())} samples "
           f"({int(ok.sum())} plotted) -> {out.name}")
@@ -164,17 +169,19 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--key", help="single session key (e.g. JS14); default: all animals")
     ap.add_argument("--region", default="CA1", choices=["CA1", "PFC"])
+    ap.add_argument("--method", default="umap", choices=["umap", "cebra", "cebratime"])
     ap.add_argument("--color-by", default="position", choices=["position", "trajtype"])
     args = ap.parse_args()
 
     assets = _key_assets()
     keys = ([args.key] if args.key else
             sorted({p.stem.split("_")[2] for p in
-                    processed_dir(DANDISET).glob(f"emb_umap_*_{args.region}_{BIN_MS}ms.npz")}))
-    print(f"000978 trajectory/manifold ({args.region}, last session, {args.color_by}): {len(keys)} animals")
+                    processed_dir(DANDISET).glob(f"emb_{args.method}_*_{args.region}_{BIN_MS}ms.npz")}))
+    print(f"000978 trajectory/manifold ({args.region}, {args.method}, last session, "
+          f"{args.color_by}): {len(keys)} animals")
     for k in keys:
         if k in assets:
-            make_figure(k, assets[k], args.region, args.color_by)
+            make_figure(k, assets[k], args.region, args.color_by, args.method)
 
 
 if __name__ == "__main__":

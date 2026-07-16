@@ -41,13 +41,14 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--subject", default="JDS-NFN-JS17")
     ap.add_argument("--condition", default="familiar", choices=["novel", "familiar"])
+    ap.add_argument("--method", default="umap", choices=["umap", "cebra", "cebratime"])
     ap.add_argument("--color-by", default="position", choices=["position", "trajtype"])
     ap.add_argument("--max-points", type=int, default=4000, help="subsample for a lighter GIF")
     ap.add_argument("--azim-step", type=int, default=3, help="degrees per frame")
     ap.add_argument("--fps", type=int, default=20)
     args = ap.parse_args()
 
-    d = np.load(processed_dir(DANDISET) / f"emb_umap_{args.subject}_CA1_{BIN_MS}ms.npz",
+    d = np.load(processed_dir(DANDISET) / f"emb_{args.method}_{args.subject}_CA1_{BIN_MS}ms.npz",
                 allow_pickle=False)
     emb, pos, cond = d["embedding"], d["position"], d["condition"]
     m = cond == args.condition
@@ -86,8 +87,10 @@ def main() -> None:
         ax.legend(handles=tl.legend_handles(), fontsize=7, loc="upper left",
                   title="arm · direction\n(dark=base → bright=well)")
         tag = "_arms"
-    ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2"); ax.set_zlabel("UMAP 3")
-    ax.set_title(f"{args.subject} CA1 ({args.condition}) — UMAP 3-D (50 ms)")
+    mlabel = {"umap": "UMAP", "cebra": "CEBRA (supervised)", "cebratime": "CEBRA-Time"}[args.method]
+    maxis = {"umap": "UMAP", "cebra": "CEBRA", "cebratime": "CEBRA-Time"}[args.method]
+    ax.set_xlabel(f"{maxis} 1"); ax.set_ylabel(f"{maxis} 2"); ax.set_zlabel(f"{maxis} 3")
+    ax.set_title(f"{args.subject} CA1 ({args.condition}) — {mlabel} 3-D (50 ms)")
 
     azims = np.arange(0, 360, args.azim_step)
 
@@ -98,7 +101,7 @@ def main() -> None:
     anim = FuncAnimation(fig, update, frames=azims, interval=1000 / args.fps, blit=False)
     outdir = REPO_ROOT / "reports" / "figures"
     outdir.mkdir(parents=True, exist_ok=True)
-    out = outdir / f"umap_rotate_000447_CA1_{args.subject}_{args.condition}_{BIN_MS}ms{tag}.gif"
+    out = outdir / f"rotate_000447_CA1_{args.subject}_{args.condition}_{args.method}_{BIN_MS}ms{tag}.gif"
     anim.save(out, writer=PillowWriter(fps=args.fps)); plt.close(fig)
     print(f"{len(E)} points, {len(azims)} frames -> {out}")
 

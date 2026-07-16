@@ -73,7 +73,17 @@ def linearized_for_condition(nwb, emb_pos, condition):
     return lin
 
 
-def _plot_position(P, E, L, subject, condition, bin_ms):
+METHOD_LABEL = {"umap": "UMAP", "cebra": "CEBRA (supervised)", "cebratime": "CEBRA-Time"}
+METHOD_AXIS = {"umap": "UMAP", "cebra": "CEBRA", "cebratime": "CEBRA-Time"}
+
+
+def _manifold_axes(ax1, method, bin_ms):
+    ax = METHOD_AXIS[method]
+    ax1.set_xlabel(f"{ax} 1"); ax1.set_ylabel(f"{ax} 2"); ax1.set_zlabel(f"{ax} 3")
+    ax1.set_title(f"CA1 activity manifold ({METHOD_LABEL[method]} 3-D, {bin_ms} ms)")
+
+
+def _plot_position(P, E, L, subject, condition, bin_ms, method):
     order = np.argsort(L)                    # draw low→high so colour layering is stable
     fig = plt.figure(figsize=(13, 5.6))
     ax0 = fig.add_subplot(1, 2, 1)
@@ -82,8 +92,7 @@ def _plot_position(P, E, L, subject, condition, bin_ms):
     ax0.set_title(f"Track trajectory — {subject} CA1 ({condition})")
     ax1 = fig.add_subplot(1, 2, 2, projection="3d")
     ax1.scatter(E[order, 0], E[order, 1], E[order, 2], c=L[order], cmap=CMAP, s=6, alpha=0.7)
-    ax1.set_xlabel("UMAP 1"); ax1.set_ylabel("UMAP 2"); ax1.set_zlabel("UMAP 3")
-    ax1.set_title(f"CA1 activity manifold (UMAP 3-D, {bin_ms} ms)")
+    _manifold_axes(ax1, method, bin_ms)
     cb = fig.colorbar(sc0, ax=[ax0, ax1], shrink=0.7, pad=0.02)
     cb.set_label("linearized track position (cm)")
     fig.suptitle("Track location ↔ neural-manifold location (shared colour = linearized position)",
@@ -91,7 +100,7 @@ def _plot_position(P, E, L, subject, condition, bin_ms):
     return fig
 
 
-def _plot_trajtype(P, E, labels, frac, subject, condition, bin_ms):
+def _plot_trajtype(P, E, labels, frac, subject, condition, bin_ms, method):
     colors = tl.point_colors(labels, frac)
     base = labels == "base"
     fig = plt.figure(figsize=(13, 5.6))
@@ -103,8 +112,7 @@ def _plot_trajtype(P, E, labels, frac, subject, condition, bin_ms):
     ax1.scatter(E[~base, 0], E[~base, 1], E[~base, 2], c=colors[~base], s=6, alpha=0.8)
     ax0.set_aspect("equal"); ax0.set_xlabel("x (cm)"); ax0.set_ylabel("y (cm)")
     ax0.set_title(f"Track trajectory — {subject} CA1 ({condition})")
-    ax1.set_xlabel("UMAP 1"); ax1.set_ylabel("UMAP 2"); ax1.set_zlabel("UMAP 3")
-    ax1.set_title(f"CA1 activity manifold (UMAP 3-D, {bin_ms} ms)")
+    _manifold_axes(ax1, method, bin_ms)
     ax0.legend(handles=tl.legend_handles(), fontsize=8, loc="upper right",
                title="arm · direction\n(dark=base → bright=well)")
     fig.suptitle("Arm × direction, shaded by location (in = toward well, out = toward base)",
@@ -118,15 +126,16 @@ def main() -> None:
     ap.add_argument("--subject", default="JDS-NFN-AM2")
     ap.add_argument("--condition", default="familiar", choices=["novel", "familiar"])
     ap.add_argument("--bin-ms", type=int, default=50, help="embedding bin size (50 or 1000)")
+    ap.add_argument("--method", default="umap", choices=["umap", "cebra", "cebratime"])
     ap.add_argument("--color-by", default="position", choices=["position", "trajtype"])
     args = ap.parse_args()
     bin_ms = args.bin_ms
     if args.color_by == "trajtype" and bin_ms != 50:
         raise SystemExit("trajtype colouring is only defined for the 50 ms smoothed embeddings")
 
-    f = processed_dir(DANDISET) / f"emb_umap_{args.subject}_CA1_{bin_ms}ms.npz"
+    f = processed_dir(DANDISET) / f"emb_{args.method}_{args.subject}_CA1_{bin_ms}ms.npz"
     if not f.exists():
-        raise FileNotFoundError(f"{f} — run the {bin_ms} ms UMAP embedding first")
+        raise FileNotFoundError(f"{f} — run the {bin_ms} ms {args.method} embedding first")
     d = np.load(f, allow_pickle=False)
     emb, pos, cond = d["embedding"], d["position"], d["condition"]
     m = cond == args.condition
@@ -139,11 +148,13 @@ def main() -> None:
     outdir = REPO_ROOT / "reports" / "figures"
     outdir.mkdir(parents=True, exist_ok=True)
 
+    stem = f"traj_manifold_000447_CA1_{args.subject}_{args.condition}_{args.method}_{bin_ms}ms"
     if args.color_by == "position":
         lin, _ = lz.linearize_position(pos[m], graph, eo, sp)
         ok = np.isfinite(lin) & np.isfinite(pos[m]).all(axis=1)
-        fig = _plot_position(pos[m][ok], emb[m][ok], lin[ok], args.subject, args.condition, bin_ms)
-        out = outdir / f"traj_manifold_000447_CA1_{args.subject}_{args.condition}_{bin_ms}ms.png"
+        fig = _plot_position(pos[m][ok], emb[m][ok], lin[ok],
+                             args.subject, args.condition, bin_ms, args.method)
+        out = outdir / f"{stem}.png"
     else:
         rm = load_rate_matrix(args.subject, "CA1", bin_ms, DANDISET)
         cc = rm["condition"] == args.condition
@@ -151,11 +162,11 @@ def main() -> None:
         assert len(labels) == int(m.sum()), f"align mismatch {len(labels)} vs {int(m.sum())}"
         ok = np.isfinite(pos[m]).all(axis=1)
         fig = _plot_trajtype(pos[m][ok], emb[m][ok], labels[ok], frac[ok],
-                             args.subject, args.condition, bin_ms)
-        out = outdir / f"traj_manifold_000447_CA1_{args.subject}_{args.condition}_{bin_ms}ms_arms.png"
+                             args.subject, args.condition, bin_ms, args.method)
+        out = outdir / f"{stem}_arms.png"
 
     fig.savefig(out, dpi=140, bbox_inches="tight"); plt.close(fig)
-    print(f"{args.subject} {args.condition} [{args.color_by}]: {m.sum()} samples "
+    print(f"{args.subject} {args.condition} {args.method} [{args.color_by}]: {m.sum()} samples "
           f"({int(ok.sum())} plotted) -> {out.name}")
 
 
