@@ -13,16 +13,35 @@ Manifold / dimensionality-reduction analysis of two related DANDI dandisets
 
 See [CLAUDE.md](CLAUDE.md) for the full pipeline and conventions.
 
+## Key findings
+
+- Both cognitive maps live on a **low-dimensional but curved** manifold — model-free
+  intrinsic dimension (TwoNN / Isomap ≈ 3–5) sits well below the linear PCA
+  participation ratio (the gap is a curvature signal).
+- **000447:** novel → familiar **transforms the map's geometry at ~fixed
+  dimensionality**. The two are different mazes, so compared at matched
+  track-relative (**linearized**) positions they share clear geometry yet reshape
+  (Procrustes ≪ shuffle null); CA1 and PFC share structure.
+- **000978:** each session's manifold is ≈ 3-D but **drifts across the day**
+  (pooled dimension ≈ 8; session subspaces rotate), **converging** toward the
+  final-session geometry as the animal learns. Sleep-replay geometry was
+  inconclusive and set aside.
+- Findings reproduce across UMAP and CEBRA (supervised + unsupervised CEBRA-Time)
+  and in embedding-independent rate space. Summary: `reports/analysis_summary.html`.
+
 ## Layout
 
 ```
 src/
-  common/     shared utilities (config.py, download.py)
-  000447/     000447 pipeline stages (01_extraction … 06_dimensionality)
-  000978/     000978 pipeline stages (TBD)
+  common/     shared utils: config, download, preprocessing, linearize,
+              dimensionality, lap_baselines, trajectory_labels, embed_smoothed
+  000447/     01_extraction … 06_dimensionality (+ 04b linearized, 05 topology,
+              figure/movie scripts)
+  000978/     01_extraction, 02, 03 (+ 06b session-sequence, 06b linearized,
+              06c sleep, 06_dimensionality, 06_dim_drift)
 notebooks/
-  000447/     one notebook per stage
-  000978/     one notebook per stage
+  000447/, 000978/   one notebook per stage (mirror src/<id>/)
+reports/      analysis_summary.html (self-contained); figures/ (gitignored)
 data/
   raw/<id>/         downloaded NWB (gitignored)
   processed/<id>/   rate matrices, embeddings, results (gitignored)

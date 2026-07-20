@@ -11,6 +11,13 @@ one notebook per pipeline stage that mirrors the matching script under
 exploration and figures; promote stable logic into the scripts so stages stay
 independently rerunnable.
 
+Highlights: baselines (`02`) use **laps as trials** for dPCA/GPFA; embeddings
+(`03`) include UMAP + CEBRA and **interactive 3-D plotly** manifolds coloured by
+track position / session; dimensionality (`06`) triangulates TwoNN / participation
+ratio / Isomap / decoding. Each folder's README lists the stages and headline
+result; the cross-dandiset summary lives in
+[`reports/analysis_summary.html`](../reports/analysis_summary.html) (self-contained).
+
 ```bash
 pixi run lab        # launch Jupyter Lab, already activated in the pixi env
 ```
